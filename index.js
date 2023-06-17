@@ -1,4 +1,6 @@
 const { Client, MessageMedia } = require("whatsapp-web.js");
+const { Configuration, OpenAIApi } = require('openai');
+const router = require("./src/routes/send.routes");
 const config = require("./config/config.json");
 const qrcode = require('qrcode-terminal');
 const express = require("express");
@@ -7,7 +9,6 @@ const moment = require("moment");
 const chalk = require("chalk");
 const fs = require("node:fs");
 const cors = require("cors");
-const router = require("./src/routes/send.routes");
 
 const app = express();
 let sessionData;
@@ -51,9 +52,7 @@ const withOutSession = () => {
 
     client_1.on('authenticated', (session) => {
         sessionData = session;
-        fs.writeFile(session_path, JSON.stringify(session, null, " "), (err) => {
-            if (err) { console.log(err) }
-        });
+        //fs.writeFile(session_path, JSON.stringify(session), function (err) { if (err) { console.log(err); } });
         console.log(chalk.blueBright(`[Whatsapp]`) + ` Session saved the day ${new Date().toLocaleDateString()} in hour ${new Date().toLocaleTimeString()}`);
     });
 
@@ -64,6 +63,22 @@ const listenMessage = () => {
     client_1.on('message', (message) => {
         const {from, to, body} = message;
 
+        switch (body) {
+            case 'Hola':
+                sendMessage(from, 'Hola, soy un asistente, estoy acargo de registrar los mensajes y interacciones de los contactos de luis antonio, si deseas saber mas de mi escribe "Ayuda"');
+                break;
+            case 'ayuda':
+                sendMessage(from, 'Hola en que te puedo ayudar o puedo guardar un recordatorio de que buscabas o que querias hacer');
+                break;
+            case 'recordatorio':
+                sendMessage(from, 'Que recordatorio quieres guardar');
+                break;
+            case 'adios':
+                sendMessage(from, 'Adios, espero verte pronto');
+                sendMedia(from, 'emoji');
+        }
+
+        chatbotMessage(message);
         historial(from, body);
         console.log(chalk.blueBright(`[Whatsapp]`) + ` Message received from ${message.from}: ${message.body}`)
     });
@@ -109,6 +124,25 @@ const historial = async (to, message) => {
             console.log(err);
         });
     }
+}
+
+const chatbotMessage = async (message) => {
+    const configuration = new Configuration({ apiKey: config.key });
+    const openai = new OpenAIApi(configuration);
+        try {
+            const response = await openai.createCompletion({
+                model: "text-davinci-003",
+                prompt: `Hola, soy una aistente, un chatbot multipropósito basado en la API Openai GPT-3\n${message.body}`,
+                temperature: 0.9,
+                max_tokens: 400,
+            });
+            if (response.data.choices[0].text.trim() !== '') {
+                message.reply(`${response.data.choices[0].text}`);
+            }
+            return;
+        } catch (e) {
+            console.log(e)
+        }
 }
 
 (fs.existsSync(session_path)) ? writeSession() : withOutSession();

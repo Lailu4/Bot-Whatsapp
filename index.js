@@ -10,6 +10,7 @@ const chalk = require("chalk");
 const fs = require("node:fs");
 const cors = require("cors");
 
+const prefix = "!";
 const app = express();
 let sessionData;
 let client_1;
@@ -17,7 +18,23 @@ let client_1;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(router);
+
+
+app.post("/send", (req, res) => {
+    const { message, to } = req.body
+    const new_number = `${to}@c.us`
+
+    sendMessage(new_number, message)
+    res.send({ status: "Enviado" })
+});
+
+app.post("/sendGroup", (req, res) => {
+    const { message, to } = req.body
+    const new_number = `${ to }@g.us`
+
+    sendMessage(new_number, message)
+    res.send({ status: "Enviado" })
+});
 
 const session_path = `./src/session/session.json`
 const writeSession = () => {
@@ -26,6 +43,9 @@ const writeSession = () => {
 
     client_1 = new Client({
         session: sessionData,
+        puppeteer: {
+            args: ['--no-sandbox'],
+        }
     });
 
     client_1.on('ready', () => {
@@ -39,7 +59,11 @@ const writeSession = () => {
 
 const withOutSession = () => {
     console.log(chalk.blueBright(`[Whatsapp]`) + ` Not session saved, please scan QR code to login`);
-    client_1 = new Client();
+    client_1 = new Client({
+        puppeteer: {
+            args: ['--no-sandbox'],
+        }
+    });
 
     client_1.on('qr', (qr) => {
         console.log(chalk.blueBright(`[Whatsapp]`) + ` QR code received, please scan`);
@@ -52,7 +76,7 @@ const withOutSession = () => {
 
     client_1.on('authenticated', (session) => {
         sessionData = session;
-        //fs.writeFile(session_path, JSON.stringify(session), function (err) { if (err) { console.log(err); } });
+        fs.writeFile(session_path, JSON.stringify(Buffer.from(JSON.stringify(session))), function(err) { if (err) console.log(err); });
         console.log(chalk.blueBright(`[Whatsapp]`) + ` Session saved the day ${new Date().toLocaleDateString()} in hour ${new Date().toLocaleTimeString()}`);
     });
 
@@ -63,22 +87,33 @@ const listenMessage = () => {
     client_1.on('message', (message) => {
         const {from, to, body} = message;
 
-        switch (body) {
-            case 'Hola':
-                sendMessage(from, 'Hola, soy un asistente, estoy acargo de registrar los mensajes y interacciones de los contactos de luis antonio, si deseas saber mas de mi escribe "Ayuda"');
-                break;
-            case 'ayuda':
-                sendMessage(from, 'Hola en que te puedo ayudar o puedo guardar un recordatorio de que buscabas o que querias hacer');
-                break;
-            case 'recordatorio':
-                sendMessage(from, 'Que recordatorio quieres guardar');
-                break;
-            case 'adios':
-                sendMessage(from, 'Adios, espero verte pronto');
-                sendMedia(from, 'emoji');
+        if (message.hasMedia) {
+            const media = message.downloadMedia();
+            const fileName = `${message.t}.${message.mimetype.split('/')[1]}`;
+            media.then((result) => {
+                fs.writeFile(`./src/media/${fileName}`, result.data, {encoding: 'base64'}, function(err) {
+                    if (err) console.log(err);
+                    console.log(chalk.blueBright(`[Whatsapp]`) + ` Message received from ${message.from}: ${message.body}`);
+                });
+            });
+            return;
         }
 
-        chatbotMessage(message);
+        if (message.body === 'Hola Mika') {
+            sendMessage(from, [
+                `Hola, soy una aistente, de luis antonio o mejor conocido como azazel`,
+                `apartir de ahora el chat sera autoguardado en un archivo excel`,
+            ].join('\n'));
+        }
+
+        if (message.body === 'adios') {
+            sendMessage(from, `Adios ${message.sender.pushname}, espero verte pronto 😊`);
+        }
+
+        if (message.body.startsWith(prefix))  {
+            chatbotMessage(message);
+        }
+
         historial(from, body);
         console.log(chalk.blueBright(`[Whatsapp]`) + ` Message received from ${message.from}: ${message.body}`)
     });
@@ -149,3 +184,5 @@ const chatbotMessage = async (message) => {
 app.listen(config.port, () => {
     console.log(chalk.blueBright(`[Whatsapp]`) + ` Server running on port ${config.port} the link: http://localhost:${config.port}`);
 });
+
+module.exports = client_1;

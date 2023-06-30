@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="https://cdn.discordapp.com/attachments/1027458270589362257/1118703556699111604/6.gif" alt="BOT VERSION"/><br/>NEKO WHATSAPP<br/>
+  <img src="https://cdn.discordapp.com/attachments/1027458270589362257/1105592234725867541/543fa8dce6e646d6c1fc586790799d82.jpg" alt="BOT VERSION"/><br/>NEKO WHATSAPP<br/>
   <img src="https://img.shields.io/badge/Discord.js-v14-%2334d058?style=flat-square&logo=npm&logoColor=fff" alt="DJS Version"/>
   <img src="https://img.shields.io/badge/Node.js-v16-%2334d058?style=flat-square&logo=npm&logoColor=fff" alt="Node Version"/>
   <img src="https://img.shields.io/badge/Version-1.0.0-%2334d058?style=flat-square&logo=npm&logoColor=fff" alt="Version"/>

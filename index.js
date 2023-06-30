@@ -1,6 +1,6 @@
-const { Client, MessageMedia } = require("whatsapp-web.js");
+const { Client, MessageMedia, LocalAuth } = require("whatsapp-web.js");
+const { chatbotMessage } = require("./plugins/chatbot");
 const { Configuration, OpenAIApi } = require('openai');
-const router = require("./src/routes/send.routes");
 const config = require("./config/config.json");
 const qrcode = require('qrcode-terminal');
 const express = require("express");
@@ -10,8 +10,8 @@ const chalk = require("chalk");
 const fs = require("node:fs");
 const cors = require("cors");
 
-const prefix = "!";
 const app = express();
+const prefix = "!";
 let sessionData;
 let client_1;
 
@@ -38,7 +38,9 @@ app.post("/sendGroup", (req, res) => {
 
 const session_path = `./src/session/session.json`
 const writeSession = () => {
-    console.log(chalk.redBright(`[Whatsapp]`) + ` Loading session the day ${new Date().toLocaleDateString()}`);
+    console.log(chalk.redBright(`[Whatsapp]`) + 
+        ` Loading session the day ${new Date().toLocaleDateString()}`);
+
     sessionData = require(session_path);
 
     client_1 = new Client({
@@ -53,20 +55,26 @@ const writeSession = () => {
     });
 
     client_1.on('auth_failure', () => {
-        console.log(chalk.redBright(`[Whatsapp]`) + ` Session expired, please scan QR code to login`);
+        console.log(chalk.redBright(`[Whatsapp]`) + 
+            ` Session expired, please scan QR code to login`);
     });
 }
 
 const withOutSession = () => {
-    console.log(chalk.blueBright(`[Whatsapp]`) + ` Not session saved, please scan QR code to login`);
+    console.log(chalk.blueBright(`[Whatsapp]`) + 
+        ` Not session saved, please scan QR code to login`);
+
     client_1 = new Client({
+        authStrategy: new LocalAuth(),
         puppeteer: {
             args: ['--no-sandbox'],
         }
     });
 
     client_1.on('qr', (qr) => {
-        console.log(chalk.blueBright(`[Whatsapp]`) + ` QR code received, please scan`);
+        console.log(chalk.blueBright(`[Whatsapp]`) + 
+        ` QR code received, please scan`);
+
         qrcode.generate(qr, { small: true });
     });
 
@@ -76,8 +84,9 @@ const withOutSession = () => {
 
     client_1.on('authenticated', (session) => {
         sessionData = session;
-        fs.writeFile(session_path, JSON.stringify(Buffer.from(JSON.stringify(session))), function(err) { if (err) console.log(err); });
-        console.log(chalk.blueBright(`[Whatsapp]`) + ` Session saved the day ${new Date().toLocaleDateString()} in hour ${new Date().toLocaleTimeString()}`);
+        fs.writeFile(session_path, JSON.stringify(session), function(err) { if (err) console.log(err); });
+        console.log(chalk.blueBright(`[Whatsapp]`) + 
+            ` Session saved the day ${new Date().toLocaleDateString()} in hour ${new Date().toLocaleTimeString()}`);
     });
 
     client_1.initialize();
@@ -93,7 +102,8 @@ const listenMessage = () => {
             media.then((result) => {
                 fs.writeFile(`./src/media/${fileName}`, result.data, {encoding: 'base64'}, function(err) {
                     if (err) console.log(err);
-                    console.log(chalk.blueBright(`[Whatsapp]`) + ` Message received from ${message.from}: ${message.body}`);
+                    console.log(chalk.blueBright(`[Whatsapp]`) + 
+                        ` Message received from ${message.from}: ${message.body}`);
                 });
             });
             return;
@@ -101,21 +111,23 @@ const listenMessage = () => {
 
         if (message.body === 'Hola Mika') {
             sendMessage(from, [
-                `Hola, soy una aistente, de luis antonio o mejor conocido como azazel`,
-                `apartir de ahora el chat sera autoguardado en un archivo excel`,
+                `Hello, I am an assistant, from Luis Antonio or better known as Azazel`, 
+                `From now on the chat will be auto-saved in an excel file`,
             ].join('\n'));
         }
 
         if (message.body === 'adios') {
-            sendMessage(from, `Adios ${message.sender.pushname}, espero verte pronto 😊`);
+            sendMessage(from, `Bye ${message.sender.pushname}, I hope to see you soon 😊`);
         }
 
         if (message.body.startsWith(prefix))  {
-            chatbotMessage(message);
+            const msg = message.body.slice(prefix.length);
+            chatbotMessage(message, msg)
         }
 
         historial(from, body);
-        console.log(chalk.blueBright(`[Whatsapp]`) + ` Message received from ${message.from}: ${message.body}`)
+        console.log(chalk.blueBright(`[Whatsapp]`) + 
+            ` Message received from ${message.from}: ${message.body}`)
     });
 }
 
@@ -143,7 +155,8 @@ const historial = async (to, message) => {
             getRowInsert.commit();
 
             workbook.xlsx.writeFile(path_chats).then(() => {
-                console.log(chalk.blueBright(`[Whatsapp]`) + ` Chat history saved in ${path_chats} file`);
+                console.log(chalk.blueBright(`[Whatsapp]`) + 
+                    ` Chat history saved in ${path_chats} file`);
             });
         });
     } else {
@@ -154,35 +167,18 @@ const historial = async (to, message) => {
         ];
         worksheet.addRow([today, message]);
         workbook.xlsx.writeFile(path_chats).then(() => {
-            console.log(chalk.blueBright(`[Whatsapp]`) + ` Chat history saved in ${path_chats} file`);
+            console.log(chalk.blueBright(`[Whatsapp]`) + 
+                ` Chat history saved in ${path_chats} file`);
         }).catch((err) => {
             console.log(err);
         });
     }
 }
 
-const chatbotMessage = async (message) => {
-    const configuration = new Configuration({ apiKey: config.key });
-    const openai = new OpenAIApi(configuration);
-        try {
-            const response = await openai.createCompletion({
-                model: "text-davinci-003",
-                prompt: `Hola, soy una aistente, un chatbot multipropósito basado en la API Openai GPT-3\n${message.body}`,
-                temperature: 0.9,
-                max_tokens: 400,
-            });
-            if (response.data.choices[0].text.trim() !== '') {
-                message.reply(`${response.data.choices[0].text}`);
-            }
-            return;
-        } catch (e) {
-            console.log(e)
-        }
-}
-
 (fs.existsSync(session_path)) ? writeSession() : withOutSession();
 app.listen(config.port, () => {
-    console.log(chalk.blueBright(`[Whatsapp]`) + ` Server running on port ${config.port} the link: http://localhost:${config.port}`);
+    console.log(chalk.blueBright(`[Whatsapp]`) + 
+        ` Server running on port ${config.port} the link: http://localhost:${config.port}`);
 });
 
 module.exports = client_1;
